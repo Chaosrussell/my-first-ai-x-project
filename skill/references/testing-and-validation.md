@@ -42,9 +42,19 @@
 
 ## 其它已知坑
 
-- 如果 `tmux` 不在:conda 环境可 `conda install -y --solver=classic tmux` 装(注意加 `--solver=classic`,因为 `CONDA_NO_PLUGINS=true` 会禁用 libmamba solver 导致报错)。方法三依赖 tmux。
+- 如果 `tmux` 不在:conda 环境可 `conda install -y --solver=classic tmux` 装(注意加 `--solver=classic`,因为 `CONDA_NO_PLUGINS=true` 会禁用 libmamba solver 导致报错)。方法三依赖 tmux。同理装 `gh` 需 `conda install -y --solver=classic -c conda-forge gh`(gh 不在 anaconda 默认频道,要加 conda-forge)。
 - macOS 无 `timeout` 命令;别用它包裹 hermes。
 - tmux 里启动 hermes 时,若 conda 报错把命令刷没了、回到 shell 提示符,直接再 `send-keys 'hermes --cli' Enter` 拉一次即可(export 已在环境里)。
+
+## 坑:交互式 TUI 登录(gh auth / 任何需要真 TTY 的向导)后台驱动不可靠
+
+阶段 6 发布到 GitHub 时会用到 `gh auth login`。它(以及 hermes 交互式界面)用的是需要**真 TTY** 的提示库,通过 `terminal(pty=true, background=true)` + `process(action=submit)` 去喂 Y/回车**经常推不动**,会卡在第一个提问上。别在这上面反复硬耗。
+
+两个应对,按顺序:
+1. **清环境启动,尽量减少噪音**:`env -i HOME="$HOME" PATH="/usr/bin:/bin:/usr/sbin:/sbin" <绝对路径>/gh auth login --hostname github.com --git-protocol https --web`。`env -i` 绕开 shell profile 的 conda init,让 gh 的 device code 不被淹没。但即便如此,交互式选择项仍可能推不动。
+2. **把交互步骤交还给用户(首选兜底)**:让用户在**他自己的真实终端**里跑 `gh auth login ...`(他有真 TTY + 浏览器在手,device-code 授权几秒完成),完成后回来说一声;登录态是持久的,之后建仓库/推送(`gh repo create`、`git push`)全部非交互,你可以接管跑完。这与阶段 6"授权步骤停下来提示学生操作、不替他填凭证"的红线完全一致。
+
+判定成功:`gh auth status` 显示已登录即可继续。不要因为后台 PTY 里残留的 conda stderr 噪音就判定登录失败——以 `gh auth status` 为准。
 
 ## 演练后常见的可改进点(历史发现,供 review 时对照)
 
